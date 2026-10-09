@@ -7,22 +7,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# PALABRAS CLAVE PARA DETECTAR TRAGEDIAS Y ALERTAS ROJAS
-PALABRAS_ALERTA = [
-    "tragedia", "alerta", "terremoto", "accidente", "urgente", "fallece", "muere", "muertos",
-    "atentado", "explosion", "bomba", "guerra", "tsunami", "sismo", "huracan", "incendio",
-    "ultima hora", "breaking", "urgencia", "colision", "derrumbe", "ataque", "desastre", "urgentes"
-]
-
-# RED DE MONITOREO INTERNACIONAL (MUNDO, LATAM Y TAILANDIA)
+# RED DE MONITOREO INTERNACIONAL MASIVO (NOTICIAS GENERALES)
 FUENTES_RSS = {
     "BBC Mundo (Internacional)": "https://bbci.co.uk",
-    "CNN en Español (Mundial)": "https://cnn.com",
-    "Reuters Latam (Global)": "https://reutersagency.com",
+    "CNN en Español (Última Hora)": "https://cnn.com",
+    "Reuters Latam (Global y Economía)": "https://reutersagency.com",
     "Infobae (LATAM General)": "https://infobae.com",
     "El Universal (México/Latam)": "https://eluniversal.com.mx",
     "El Tiempo (Colombia/Sudam)": "https://eltiempo.com",
-    "Bangkok Post (Tailandia)": "https://bangkokpost.com"
+    "Bangkok Post (Tailandia General)": "https://bangkokpost.com"
 }
 
 class Servidor(BaseHTTPRequestHandler):
@@ -30,7 +23,7 @@ class Servidor(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(b"Bot de Alertas Internacionales Activo")
+        self.wfile.write(b"Bot de Noticias Generales Activo")
 
     def do_HEAD(self):
         self.send_response(200)
@@ -45,7 +38,7 @@ threading.Thread(target=run_server, daemon=True).start()
 
 def enviar_a_discord(link, titulo, fuente, imagen_url=None):
     payload = {
-        "content": f"**🚨 ÚLTIMA HORA | NOTICIA MUNDIAL 🌍**\n\n📢 **Fuente:** {fuente}\n📌 **Suceso:** {titulo}\n\n✨ Más información y detalles aquí:\n{link}"
+        "content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA 📢**\n\n📢 **Fuente:** {fuente}\n📌 **Suceso:** {titulo}\n\n✨ Más información y detalles aquí:\n{link}"
     }
     
     if imagen_url:
@@ -70,16 +63,9 @@ def extraer_imagen(item_texto):
         pass
     return None
 
-def es_noticia_urgente(texto_a_revisar):
-    texto_minusculas = texto_a_revisar.lower()
-    for palabra in PALABRAS_ALERTA:
-        if palabra in texto_minusculas:
-            return True
-    return False
-
 def bucle_monitoreo():
     ultimas_noticias = {}
-    print("Iniciando escaneo masivo de noticias globales...")
+    print("Iniciando escaneo masivo de noticias globales generales...")
     
     while True:
         for nombre_fuente, url_rss in FUENTES_RSS.items():
@@ -107,15 +93,14 @@ def bucle_monitoreo():
                 if nombre_fuente not in ultimas_noticias:
                     ultimas_noticias[nombre_fuente] = link_actual
                     continue
+                
+                # ENVIAR ABSOLUTAMENTE TODO SI EL ENLACE ES NUEVO
                 if link_actual != ultimas_noticias[nombre_fuente]:
                     ultimas_noticias[nombre_fuente] = link_actual
-                    
-                    # Filtro de noticias mundiales de impacto
-                    if es_noticia_urgente(titulo_actual):
-                        enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
+                    enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
             except Exception:
                 pass
-        time.sleep(300)  # Revisa noticias urgentes cada 5 minutos debido a la rapidez de las agencias
+        time.sleep(300)  # Revisa las agencias mundiales cada 5 minutos
 
 if __name__ == "__main__":
     bucle_monitoreo()
