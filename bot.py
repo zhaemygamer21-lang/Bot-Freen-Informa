@@ -7,15 +7,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# RED DE MONITOREO INTERNACIONAL MASIVO (NOTICIAS GENERALES)
+# RED DE MONITOREO INTERNACIONAL MASIVO
 FUENTES_RSS = {
     "BBC Mundo (Internacional)": "https://bbci.co.uk",
-    "CNN en Español (Última Hora)": "https://cnn.com",
-    "Reuters Latam (Global y Economía)": "https://reutersagency.com",
+    "CNN en Español (Mundial)": "https://cnn.com",
+    "Reuters Latam (Global)": "https://reutersagency.com",
     "Infobae (LATAM General)": "https://infobae.com",
-    "El Universal (México/Latam)": "https://eluniversal.com.mx",
-    "El Tiempo (Colombia/Sudam)": "https://eltiempo.com",
-    "Bangkok Post (Tailandia General)": "https://bangkokpost.com"
+    "El Universal (Mexico)": "https://eluniversal.com.mx",
+    "El Tiempo (Colombia)": "https://eltiempo.com"
 }
 
 class Servidor(BaseHTTPRequestHandler):
@@ -40,15 +39,15 @@ def enviar_a_discord(link, titulo, fuente, imagen_url=None):
     payload = {
         "content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA 📢**\n\n📢 **Fuente:** {fuente}\n📌 **Suceso:** {titulo}\n\n✨ Más información y detalles aquí:\n{link}"
     }
-    
     if imagen_url:
         payload["embeds"] = [{"image": {"url": imagen_url}}]
 
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
-    except Exception:
-        pass
+        res = requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
+        print(f"Envio a Discord - Estatus: {res.status_code}")
+    except Exception as e:
+        print(f"Error al enviar a Discord: {e}")
 
 def extraer_imagen(item_texto):
     try:
@@ -65,7 +64,7 @@ def extraer_imagen(item_texto):
 
 def bucle_monitoreo():
     ultimas_noticias = {}
-    print("Iniciando escaneo masivo de noticias globales generales...")
+    print("Iniciando escaneo masivo de noticias globales...")
     
     while True:
         for nombre_fuente, url_rss in FUENTES_RSS.items():
@@ -88,19 +87,15 @@ def bucle_monitoreo():
                 
                 foto_actual = extraer_imagen(primer_item)
                 
-                if not link_actual:
-                    continue
-                if nombre_fuente not in ultimas_noticias:
-                    ultimas_noticias[nombre_fuente] = link_actual
-                    continue
-                
-                # ENVIAR ABSOLUTAMENTE TODO SI EL ENLACE ES NUEVO
-                if link_actual != ultimas_noticias[nombre_fuente]:
-                    ultimas_noticias[nombre_fuente] = link_actual
-                    enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
-            except Exception:
-                pass
-        time.sleep(300)  # Revisa las agencias mundiales cada 5 minutos
+                if link_actual:
+                    # Si es la primera vez que ve la fuente o el enlace es diferente, envía de inmediato
+                    if nombre_fuente not in ultimas_noticias or link_actual != ultimas_noticias[nombre_fuente]:
+                        ultimas_noticias[nombre_fuente] = link_actual
+                        enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
+                        time.sleep(2) # Pausa de seguridad entre envíos
+            except Exception as e:
+                print(f"Error en fuente {nombre_fuente}: {e}")
+        time.sleep(300) # Revisa cada 5 minutos
 
 if __name__ == "__main__":
     bucle_monitoreo()
