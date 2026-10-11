@@ -3,13 +3,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# ENLACES RSS OFICIALES Y VERIFICADOS CON SUS RUTAS COMPLETAS
+# ENLACES INTEGRADOS EXACTAMENTE COMO LOS ENVIASTE (SIN CORTAR NI EDITAR)
 FUENTES_RSS = {
-    "BBC Mundo (Internacional)": "https://bbci.co.uk",
-    "CNN en Español (Mundial)": "https://cnn.com",
-    "Infobae (LATAM General)": "https://infobae.com",
-    "El Tiempo (Colombia/Sudam)": "https://eltiempo.com",
-    "Bangkok Post (Tailandia)": "https://bangkokpost.com"
+    "CNN en Español": "https://cnnespanol.cnn.com/",
+    "El Nacional": "https://www.elnacional.com/",
+    "BBC Mundo": "https://www.bbc.com/mundo",
+    "Telemundo Noticias": "https://www.telemundo.com/noticias",
+    "Bangkok Post": "https://www.bangkokpost.com/",
+    "Infobae America": "https://www.infobae.com/america/",
+    "El Tiempo": "https://www.eltiempo.com/",
+    "El Pais America": "https://elpais.com/america/"
 }
 
 class Servidor(BaseHTTPRequestHandler):
@@ -24,67 +27,39 @@ class Servidor(BaseHTTPRequestHandler):
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), Servidor)
-    server.serve_forever()
+    HTTPServer(("0.0.0.0", port), Servidor).serve_forever()
 
 threading.Thread(target=run_server, daemon=True).start()
 
 def enviar_a_discord(link, titulo, fuente, imagen_url=None):
-    payload = {
-        "content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA 📢**\n\n📢 **Fuente:** {fuente}\n📌 **Suceso:** {titulo}\n\n✨ Más información y detalles aquí:\n{link}"
-    }
-    if imagen_url:
-        payload["embeds"] = [{"image": {"url": imagen_url}}]
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
-    except Exception:
-        pass
+    payload = {"content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA 📢**\n\n📢 **Fuente:** {fuente}\n📌 **Suceso:** {titulo}\n\n✨ Más información y detalles aquí:\n{link}"}
+    if imagen_url: payload["embeds"] = [{"image": {"url": imagen_url}}]
+    try: requests.post(WEBHOOK_URL, json=payload, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    except: pass
 
 def extraer_imagen(item_texto):
-    try:
-        url_match = re.search(r'<media:content[^>]*url="([^"]+)"', item_texto)
-        if not url_match:
-            url_match = re.search(r'<enclosure[^>]*url="([^"]+)"', item_texto)
-        if not url_match:
-            url_match = re.search(r'<img[^>]*src="([^"]+)"', item_texto)
-        if url_match:
-            return url_match.group(1).strip()
-    except Exception:
-        pass
+    for patron in [r'<media:content[^>]*url="([^"]+)"', r'<enclosure[^>]*url="([^"]+)"', r'<img[^>]*src="([^"]+)"']:
+        match = re.search(patron, item_texto)
+        if match: return match.group(1).strip()
     return None
 
 def bucle_monitoreo():
     ultimas_noticias = {}
-    print("Iniciando escaneo masivo de noticias globales...")
     while True:
         for nombre_fuente, url_rss in FUENTES_RSS.items():
             try:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                response = requests.get(url_rss, headers=headers, timeout=15)
-                if response.status_code != 200 or "<item>" not in response.text:
-                    continue
-                texto = response.text
-                primer_item = texto[texto.find("<item>"):texto.find("</item>")+7]
-                inicio_link = primer_item.find("<link>") + 6
-                fin_link = primer_item.find("</link>")
-                link_actual = primer_item[inicio_link:fin_link].strip().replace("<![CDATA[", "").replace("]]>", "")
-                inicio_title = primer_item.find("<title>") + 7
-                fin_title = primer_item.find("</title>")
-                titulo_actual = primer_item[inicio_title:fin_title].strip().replace("<![CDATA[", "").replace("]]>", "")
-                foto_actual = extraer_imagen(primer_item)
-                if link_actual:
-                    if nombre_fuente not in ultimas_noticias or link_actual != ultimas_noticias[nombre_fuente]:
-                        ultimas_noticias[nombre_fuente] = link_actual
-                        enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
-                        time.sleep(2)
-            except Exception:
-                pass
+                res = requests.get(url_rss, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=15)
+                if res.status_code != 200 or "<item>" not in res.text: continue
+                item = res.text[res.text.find("<item>"):res.text.find("</item>")+7]
+                link = item[item.find("<link>")+6:item.find("</link>")].strip().replace("<![CDATA[", "").replace("]]>", "")
+                title = item[item.find("<title>")+7:item.find("</title>")].strip().replace("<![CDATA[", "").replace("]]>", "")
+                foto = extraer_imagen(item)
+                if link and (nombre_fuente not in ultimas_noticias or link != ultimas_noticias[nombre_fuente]):
+                    ultimas_noticias[nombre_fuente] = link
+                    enviar_a_discord(link, title, nombre_fuente, foto)
+                    time.sleep(2)
+            except: pass
         time.sleep(300)
 
-def iniciar_sistema():
+if __name__ == "__main__":
     bucle_monitoreo()
-
-if __name__ == '__main__':
-    iniciar_sistema()
-    
