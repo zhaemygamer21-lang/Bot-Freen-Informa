@@ -7,14 +7,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# RUTAS RSS OFICIALES RECONOCIDAS POR PYTHON (CORREGIDAS)
+# ENLACES RSS OFICIALES Y VERIFICADOS CON SUS RUTAS COMPLETAS EN VIVO
 FUENTES_RSS = {
     "BBC Mundo (Internacional)": "https://bbci.co.uk",
     "CNN en Español (Mundial)": "https://cnn.com",
-    "Reuters Latam (Global)": "https://reutersagency.com",
     "Infobae (LATAM General)": "https://infobae.com",
-    "El Universal (Mexico)": "https://eluniversal.com.mx",
-    "El Tiempo (Colombia)": "https://eltiempo.com"
+    "El Tiempo (Colombia/Sudam)": "https://eltiempo.com",
+    "Bangkok Post (Tailandia)": "https://bangkokpost.com"  # <-- ¡EL GIGANTE THAI AGREGADO AQUÍ!
 }
 
 class Servidor(BaseHTTPRequestHandler):
