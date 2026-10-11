@@ -3,18 +3,18 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# TUS 9 RUTAS COPIADAS EXACTAMENTE LETRA POR LETRA COMO LAS MANDASTE
-PAGINAS_WEB = [
-    "https://cnnespanol.cnn.com/",
-    "https://www.elnacional.com/",
-    "https://www.bangkokpost.com/",
-    "https://www.eltiempo.com/",
-    "https://www.bbc.com/mundo",
-    "https://www.telemundo.com/noticias",
-    "https://www.eluniversal.com.mx/",
-    "https://amp.milenio.com/",
-    "https://elpais.com/mexico/"
-]
+# TUS 9 ENLACES PLANOS CONFIGURADOS EXACTAMENTE COMO LOS MANDASTE
+FUENTES_WEB = {
+    "CNN en Español": "https://cnnespanol.cnn.com/",
+    "El Nacional": "https://www.elnacional.com/",
+    "Bangkok Post": "https://www.bangkokpost.com/",
+    "El Tiempo": "https://www.eltiempo.com/",
+    "BBC Mundo": "https://www.bbc.com/mundo",
+    "Telemundo Noticias": "https://www.telemundo.com/noticias",
+    "El Universal": "https://www.eluniversal.com.mx/",
+    "Milenio": "https://amp.milenio.com/",
+    "El Pais Mexico": "https://elpais.com/mexico/"
+}
 
 class Servidor(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -32,51 +32,59 @@ def run_server():
 
 threading.Thread(target=run_server, daemon=True).start()
 
-def enviar_a_discord(texto_alerta, url_origen):
+def enviar_a_discord(link, titulo, resumen, fuente):
     payload = {
-        "content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA FREEN INFORMA 📢**\n\n📌 **Actualización detectada en:** {url_origen}\n📝 **Contenido nuevo:** {texto_alerta}"
+        "content": f"**🌍 NOTICIA EN DESARROLLO | ÚLTIMA HORA FREEN INFORMA 📢**\n📌 **Fuente:** {fuente}",
+        "embeds": [{
+            "title": titulo,
+            "description": resumen if resumen else "Haz clic en el enlace para leer los detalles completos de este suceso.",
+            "url": link,
+            "color": 15158332
+        }]
     }
     try:
         requests.post(WEBHOOK_URL, json=payload, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
     except:
         pass
 
-def limpiar_html(html_puro):
-    # Remueve scripts, estilos y etiquetas para extraer el texto plano de la pagina
-    texto = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', html_puro)
-    texto = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', texto)
-    texto = re.sub(r'<[^>]+>', ' ', texto)
-    texto = re.sub(r'\s+', ' ', texto)
-    return texto.strip()
+def buscar_titulos_y_resumenes(html_puro):
+    # Busca bloques de encabezados comunes con sus parrafos adyacentes para armar tarjetas
+    enlaces_encontrados = []
+    bloques = re.findall(r'<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)</a>', html_puro)
+    
+    for link, contenido in bloques:
+        if not link.startswith("http"): continue
+        texto = re.sub(r'<[^>]+>', ' ', contenido)
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        
+        if len(texto) > 25 and not any(x in texto.lower() for x in ["términos", "privacidad", "cookies", "contacto"]):
+            titulo = texto[:80]
+            resumen = texto[80:330] if len(texto) > 80 else "Haz clic en el enlace para conocer los detalles del reporte."
+            enlaces_encontrados.append((link, titulo, resumen))
+            if len(enlaces_encontrados) >= 1: break
+            
+    return enlaces_encontrados
 
 def bucle_monitoreo():
-    estados_anteriores = {}
-    print("Iniciando rastreador directo de paginas web...")
+    ultimas_noticias = {}
+    print("Iniciando escaneo inteligente de portales web...")
     
     while True:
-        for url in PAGINAS_WEB:
+        for nombre_fuente, url in FUENTES_WEB.items():
             try:
                 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                 res = requests.get(url, headers=headers, timeout=15)
                 if res.status_code != 200: continue
                 
-                texto_limpio = limpiar_html(res.text)
-                # Tomamos un fragmento del texto de la portada para monitorear variaciones
-                resumen_actual = texto_limpio[:400]
-                
-                if url not in estados_anteriores:
-                    estados_anteriores[url] = resumen_actual
-                    # Envio inicial forzado para que veas actividad de inmediato al guardar
-                    enviar_a_discord(resumen_actual[:150] + "...", url)
-                    continue
-                
-                if resumen_actual != estados_anteriores[url]:
-                    estados_anteriores[url] = resumen_actual
-                    enviar_a_discord(resumen_actual[:150] + "...", url)
-                    time.sleep(2)
+                noticias = buscar_titulos_y_resumenes(res.text)
+                for link, titulo, resumen in noticias:
+                    if nombre_fuente not in ultimas_noticias or link != ultimas_noticias[nombre_fuente]:
+                        ultimas_noticias[nombre_fuente] = link
+                        enviar_a_discord(link, titulo, resumen, nombre_fuente)
+                        time.sleep(2)
             except:
                 pass
-        time.sleep(300) # Revisa las 9 webs cada 5 minutos
+        time.sleep(300)
 
 if __name__ == "__main__":
     bucle_monitoreo()
