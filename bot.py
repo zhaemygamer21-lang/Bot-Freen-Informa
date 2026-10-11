@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# RED DE MONITOREO INTERNACIONAL MASIVO
+# RUTAS RSS OFICIALES RECONOCIDAS POR PYTHON (CORREGIDAS)
 FUENTES_RSS = {
     "BBC Mundo (Internacional)": "https://bbci.co.uk",
     "CNN en Español (Mundial)": "https://cnn.com",
@@ -88,14 +88,13 @@ def bucle_monitoreo():
                 foto_actual = extraer_imagen(primer_item)
                 
                 if link_actual:
-                    # Si es la primera vez que ve la fuente o el enlace es diferente, envía de inmediato
                     if nombre_fuente not in ultimas_noticias or link_actual != ultimas_noticias[nombre_fuente]:
                         ultimas_noticias[nombre_fuente] = link_actual
                         enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
-                        time.sleep(2) # Pausa de seguridad entre envíos
+                        time.sleep(2) 
             except Exception as e:
                 print(f"Error en fuente {nombre_fuente}: {e}")
-        time.sleep(300) # Revisa cada 5 minutos
+        time.sleep(300) 
 
 if __name__ == "__main__":
     bucle_monitoreo()
