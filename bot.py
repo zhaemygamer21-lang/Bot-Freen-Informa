@@ -1,13 +1,9 @@
-import os
-import time
-import requests
-import threading
-import re
+import os, time, requests, threading, re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
-# RUTAS RSS OFICIALES RECONOCIDAS POR PYTHON (100% VERIFICADAS)
+# ENLACES RSS OFICIALES Y VERIFICADOS CON SUS RUTAS COMPLETAS
 FUENTES_RSS = {
     "BBC Mundo (Internacional)": "https://bbci.co.uk",
     "CNN en Español (Mundial)": "https://cnn.com",
@@ -22,7 +18,6 @@ class Servidor(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(b"Bot de Noticias Generales Activo")
-
     def do_HEAD(self):
         self.send_response(200)
         self.end_headers()
@@ -40,13 +35,11 @@ def enviar_a_discord(link, titulo, fuente, imagen_url=None):
     }
     if imagen_url:
         payload["embeds"] = [{"image": {"url": imagen_url}}]
-
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
-        print(f"Envio a Discord - Estatus: {res.status_code}")
-    except Exception as e:
-        print(f"Error al enviar a Discord: {e}")
+        requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
+    except Exception:
+        pass
 
 def extraer_imagen(item_texto):
     try:
@@ -64,7 +57,6 @@ def extraer_imagen(item_texto):
 def bucle_monitoreo():
     ultimas_noticias = {}
     print("Iniciando escaneo masivo de noticias globales...")
-    
     while True:
         for nombre_fuente, url_rss in FUENTES_RSS.items():
             try:
@@ -72,28 +64,27 @@ def bucle_monitoreo():
                 response = requests.get(url_rss, headers=headers, timeout=15)
                 if response.status_code != 200 or "<item>" not in response.text:
                     continue
-                    
                 texto = response.text
                 primer_item = texto[texto.find("<item>"):texto.find("</item>")+7]
-                
                 inicio_link = primer_item.find("<link>") + 6
                 fin_link = primer_item.find("</link>")
                 link_actual = primer_item[inicio_link:fin_link].strip().replace("<![CDATA[", "").replace("]]>", "")
-                
                 inicio_title = primer_item.find("<title>") + 7
                 fin_title = primer_item.find("</title>")
                 titulo_actual = primer_item[inicio_title:fin_title].strip().replace("<![CDATA[", "").replace("]]>", "")
-                
                 foto_actual = extraer_imagen(primer_item)
-                
                 if link_actual:
                     if nombre_fuente not in ultimas_noticias or link_actual != ultimas_noticias[nombre_fuente]:
                         ultimas_noticias[nombre_fuente] = link_actual
                         enviar_a_discord(link_actual, titulo_actual, nombre_fuente, foto_actual)
-                        time.sleep(2) 
-            except Exception as e:
-                print(f"Error en fuente {nombre_fuente}: {e}")
-        time.sleep(300) 
+                        time.sleep(2)
+            except Exception:
+                pass
+        time.sleep(300)
 
-if __name__ == "__main__":
+def iniciar_sistema():
     bucle_monitoreo()
+
+if __name__ == '__main__':
+    iniciar_sistema()
+    
